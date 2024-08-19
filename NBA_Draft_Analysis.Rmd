@@ -1,0 +1,689 @@
+---
+title: "NBA Draft Analysis"
+output:
+  html_document:
+    warning: FALSE
+date: "`r Sys.Date()`"
+author: "Ryan Merrithew"
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r installing packages, results='hide'}
+library(tidyverse)
+library(gt)
+library(gtExtras)
+library(rvest)
+library(janitor)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(DT)
+```
+
+```{r nba draft data, results='hide'}
+#Grabbing all years from 2000-2019
+Years <- 2000:2019
+#Putting allyears into one dataframe
+AllYearsDraft <- data.frame()
+#Starting a for loop to loop through every year
+for(i in Years) {
+  # Grabbing how long it takes to grab each table
+TimeA <- Sys.time()
+# Reading in the html and replacing i with year in the for loop
+filmURL <- read_html(paste0("https://www.basketball-reference.com/draft/NBA_",i,".html"))
+# Using the html_table function to read in the url and place it in all tables
+allTables <- filmURL %>%
+  html_table(fill = TRUE)
+# Combines all of the tables together
+Table <- allTables[[1]]
+# Making the first row the headers for the table
+Table <- row_to_names(Table, row_number = 1)
+#Changing some of the column names
+colnames(Table)[8:14] <- c("TMP", "TPTS", "TTRB", "TAST","FGp","ThPp","FTp")
+# Changing the data type for some of the data
+Table <- Table |>
+  filter(!Player %in% c('Player', 'Round 2', '')) |>
+  mutate(Rk = as.numeric(Rk),
+         Pk = as.numeric(Pk),
+         Yrs = as.numeric(Yrs),
+         G = as.numeric(G),
+         TMP = as.numeric(TMP),
+         TPTS = as.numeric(TPTS),
+         TTRB = as.numeric(TTRB),
+         TAST = as.numeric(TAST),
+         FGp = as.numeric(FGp),
+         ThPp = as.numeric(ThPp),
+         FTp = as.numeric(FTp),
+         MPG = as.numeric(MP),
+         PPG = as.numeric(PTS),
+         RPG = as.numeric(TRB),
+         APG = as.numeric(AST),
+         WS = as.numeric(WS),
+         WS48 = as.numeric(`WS/48`),
+         BPM = as.numeric(BPM),
+         VORP = as.numeric(VORP),
+         Year = i)
+# Binding the data together
+AllYearsDraft <- rbind(AllYearsDraft,Table)
+# Makes sure that I am not locked out of basketball reference
+Sys.sleep(3)
+# End of time it took to extract data
+TimeB <- Sys.time()
+# Finding the time difference and printing it
+TimeC <- TimeB-TimeA}
+```
+
+```{r nba player data, results='hide'}
+# Grabbing all years from 2001-2024
+Years <- 2001:2024
+# Creating an empty player stats dataframe
+AllYearsPlayers <- data.frame()
+# Creating a for loop 
+for (i in Years) {
+  TimeA <- Sys.time()
+  filmURL <- read_html(paste0("https://www.basketball-reference.com/leagues/NBA_",i,"_per_game.html"))
+  allTables <- filmURL |>
+    html_table(fill=TRUE)
+  Table <- allTables[[1]]
+  Table <- Table |>
+    filter(!Player %in% 'Player') |>
+    mutate(Rk = as.numeric(Rk),
+           G = as.numeric(G),
+           GS = as.numeric(GS),
+           MP = as.numeric(MP),
+           FG = as.numeric(FG),
+           FGA = as.numeric(FGA),
+           ThP = as.numeric(`3P`),
+           ThPa = as.numeric(`3PA`),
+           PTS = as.numeric(PTS),
+           TRB = as.numeric(TRB),
+           AST = as.numeric(AST),
+           FGp = as.numeric(`FG%`),
+           ThPp = as.numeric(`3P%`),
+           FTp = as.numeric(`FT%`),
+           Year = i) %>%
+    select(-`FG%`, -`3P%`, -`FT%`)
+  AllYearsPlayers <- rbind(AllYearsPlayers,Table)
+  Sys.sleep(3)
+  TimeB <- Sys.time()
+  TimeC <- TimeB-TimeA}
+```
+
+```{r nba advanced data, results='hide'}
+# Grabbing all years from 2001-2024
+Years <- 2001:2024
+# Creating an empty player stats dataframe
+AllYearsAdvanced <- data.frame()
+# Creating a for loop 
+for (i in Years) {
+  TimeA <- Sys.time()
+  filmURL <- read_html(paste0("https://www.basketball-reference.com/leagues/NBA_", i, "_advanced.html"))
+  allTables <- filmURL |>
+    html_table(fill=TRUE)
+  Table <- allTables[[1]]
+  Table <- Table |>
+    select(where(~ !all(is.na(.) | . == ""))) |>
+    filter(!Player %in% 'Player') |>
+    mutate(WS = as.numeric(WS),
+           BPM = as.numeric(BPM),
+           G = as.numeric(G),
+           Year = i) 
+  AllYearsAdvanced <- rbind(AllYearsAdvanced,Table)
+  Sys.sleep(3)
+  TimeB <- Sys.time()
+  TimeC <- TimeB-TimeA}
+```
+
+```{r cleaning the dataframes, results='hide'}
+# Cleaning the draft data
+AllYearsDraft <- AllYearsDraft |>
+  select("Pk", "Player", "Year") 
+# Cleaning the player stats dataframe
+AllYearsPlayers <- AllYearsPlayers |>
+  select("Player", "Year", "G", "PTS", "TRB", "AST", "STL", "BLK", "TOV", "MP") |>
+  mutate(STL = as.numeric(STL),
+         BLK = as.numeric(BLK),
+         TOV = as.numeric(TOV)
+  )
+# Cleaning the advanced dataframe
+AllYearsAdvanced <- AllYearsAdvanced |>
+  select("Player", "Year", "G", "PER", "WS", "BPM") |>
+  mutate(PER = as.numeric(PER)) 
+
+```
+
+```{r, results='hide'}
+# More data cleaning, creating a table with number of games
+GamesByYear <- data.frame(
+  Year = c(2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024),
+  MaxGP = c(82, 82, 82, 82, 82, 82, 82, 82, 82, 82, 82, 66, 82, 82, 82, 82, 82, 82, 82, 75, 72, 82, 82, 82)
+)
+# Merge the games played data onto the player data
+AllYearsPlayers <- AllYearsPlayers |>
+  left_join(GamesByYear, by = c('Year'))
+# Removing players that played less than half of the games
+AllYearsPlayers <- AllYearsPlayers |>
+  filter(G / MaxGP >= 0.5)
+```
+
+```{r, results='hide'}
+# Merge the games played data onto the player advanced data
+AllYearsAdvanced <- AllYearsAdvanced |>
+  left_join(GamesByYear, by = c('Year'))
+# Removing players that played less than half of the games
+AllYearsAdvanced <- AllYearsAdvanced |>
+  filter(G / MaxGP >= 0.5)
+```
+
+```{r, results='hide'}
+# Merging the advanced and player tables together
+PlayerStats <- AllYearsPlayers |>
+  left_join(AllYearsAdvanced, c('Player', 'Year', 'G'))
+# Removing rows that are not unique for (Player, Year)
+PlayerStats <- PlayerStats %>%
+  group_by(Player, Year) %>%
+  filter(G == max(G)) %>%
+  ungroup()
+```
+
+```{r, results='hide'}
+# Removing some columns from the dataframe and creating a new overall calculation 
+PlayerStats <- PlayerStats |>
+  select("Player", "Year", "G", "MP", "PTS", "TRB", "AST", "STL", "BLK", "TOV", "PER", "WS", "BPM") |>
+  mutate(
+    WSp82 = ((WS/G) * 82),
+    Total = (PTS * 2 + TRB * 1.2 + AST * 1.5 + STL * 3 + BLK * 3 - TOV * 2 + (MP/2) + WSp82)
+  )
+
+```
+
+```{r, results='hide'}
+# Rnaking players
+PlayerStats <- PlayerStats |>
+  group_by(Year) |>
+  mutate(
+    Rank = dense_rank(desc(Total))
+  ) |>
+  ungroup()
+```
+
+```{r, results='hide'}
+# Getting an average of the best 3 years of a player's career
+PlayerPrimes <- PlayerStats |>
+  group_by(Player) |>
+  summarise(
+    Prime_rank = mean(sort(Rank)[1:3])
+  )
+```
+
+```{r, results='hide'}
+PlayerPrimes <- PlayerPrimes |>
+  mutate(
+    PlayerLevel = case_when(
+      Prime_rank <= 5 ~ "Superstar",
+      Prime_rank <= 15 ~ "All-NBA",
+      Prime_rank <= 30 ~ "All-Star",
+      Prime_rank <= 50 ~ "High-end Starter",
+      Prime_rank <= 100 ~ "Starter",
+      Prime_rank <= 150 ~ "Role Player",
+      Prime_rank <= 200 ~ "Rotation Player",
+      Prime_rank <= 250 ~ "Bench Player",
+      TRUE ~ "Non-Impact"
+    )
+  )
+```
+
+```{r, results='hide'}
+# Making sure there are no duplicate names before I join
+num_unique_draft <- length(unique(AllYearsDraft$Player))
+num_unique_primes <- length(unique(PlayerPrimes$Player))
+# Getting list of duplicate player names
+duplicated_values <- AllYearsDraft$Player[duplicated(AllYearsDraft$Player)]
+# Remove character in order for data to join properly
+PlayerPrimes$Player <- sub("\\*$", "", PlayerPrimes$Player)
+# Left joining the prime table to the draft table
+DraftData <- AllYearsDraft |>
+  left_join(PlayerPrimes, by = c('Player'))
+# Removing duplicates and making manual changes
+DraftData[DraftData$Player == "Marcus Thornton" & DraftData$Year == 2015, c("PlayerLevel", "Prime_rank")] <- 
+  list("Non-Impact", NA)
+DraftData[DraftData$Player == "Marcus Williams" & DraftData$Year == 2007, c("PlayerLevel", "Prime_rank")] <- 
+  list("Non-Impact", NA)
+DraftData[DraftData$Player == "Justin Jackson" & DraftData$Year == 2018, c("PlayerLevel", "Prime_rank")] <- 
+  list("Non-Impact", NA)
+DraftData[DraftData$Player == "Zion Williamson", c("PlayerLevel", "Prime_rank")] <- 
+  list("All-Star", 20.5)
+DraftData$PlayerLevel[is.na(DraftData$PlayerLevel)] <- "Non-Impact"
+```
+
+```{r, results='hide'}
+# Creating a sensitivity table
+sensitivity_table <- DraftData |>
+  group_by(Pk, PlayerLevel) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = PlayerLevel, values_from = count, values_fill = list(count = 0)) |>
+  ungroup()
+
+sensitivity_table <- sensitivity_table |>
+  select('Pk', 'Superstar', 'All-NBA', 'All-Star', 'High-end Starter', 'Starter', 'Role Player', 'Rotation Player', 'Bench Player', 'Non-Impact') |>
+  rename(Pk = 0)
+# Add a 'Total' column which is the row sum of all columns except 'Pk'
+sensitivity_table <- sensitivity_table %>%
+  rowwise() %>%
+  mutate(Total = sum(c_across(-Pk))) %>%
+  ungroup() %>%
+  # Normalize the values by dividing each value by the Total
+  mutate(across(-c(Pk, Total), ~ . / Total)) %>%
+  # Convert numeric values to percentage format
+  mutate(across(-c(Pk, Total))) %>%
+  select(Pk, everything()) |>
+  select(-Total)
+
+```
+
+
+
+```{r}
+gt_table <- sensitivity_table %>%
+  gt() %>%
+  fmt_percent(
+    columns = vars(Superstar, `All-NBA`, `All-Star`, `High-end Starter`, Starter, `Role Player`, `Rotation Player`, `Bench Player`, `Non-Impact`),
+    decimals = 0  # Adjust decimals as needed
+  ) %>%
+  data_color(
+    columns = vars(Superstar, `All-NBA`, `All-Star`, `High-end Starter`, Starter, `Role Player`, `Rotation Player`, `Bench Player`, `Non-Impact`),
+    colors = scales::col_numeric(
+      palette = c("lightyellow", "darkred"),
+      domain = NULL
+    )
+  ) %>%
+  tab_header(
+    title = "History of NBA Draft Pick Value From 2000 to 2019",
+    subtitle = "This table shows what percentage of players were taken in each player tier for each individual draft pick. All numbers are percentages of the pick. "
+  ) %>%
+  tab_spanner(
+    label = "Player Tiers",
+    columns = vars(Superstar, `All-NBA`, `All-Star`, `High-end Starter`, Starter, `Role Player`, `Rotation Player`, `Bench Player`, `Non-Impact`)
+  )
+
+# Print the table
+gt_table
+```
+
+
+```{r, results='hide'}
+sensitivity_table_total <- DraftData |>
+  group_by(Pk, PlayerLevel) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = PlayerLevel, values_from = count, values_fill = list(count = 0)) |>
+  ungroup()
+
+sensitivity_table_total <- sensitivity_table_total |>
+  select('Pk', 'Superstar', 'All-NBA', 'All-Star', 'High-end Starter', 'Starter', 'Role Player', 'Rotation Player', 'Bench Player', 'Non-Impact') |>
+  rename(Pk = 0)
+# Adding in draft range column
+sensitivity_table_total <- sensitivity_table_total |>
+  mutate(pick_range = case_when(
+    Pk >= 1 & Pk <= 14 ~ "Lottery",
+    Pk >= 15 & Pk <= 30 ~ "Non Lottery 1st Round",
+    Pk >= 31 & Pk <= 60 ~ "2nd Round",
+    TRUE ~ "Other"
+  ))
+# Creating a score to evaluate the total value of a draft position
+sensitivity_table_total <- sensitivity_table_total |>
+  mutate(allstar_total = Superstar + `All-NBA` + `All-Star`,
+         score = Superstar * 10 + `All-NBA` * 7 + `All-Star` * 5 + `High-end Starter` * 4 + Starter * 3 + `Role Player` * 2 + `Rotation Player` + `Bench Player` * 0.5)
+
+total_value = sum(sensitivity_table_total$score)
+
+draft_values <- sensitivity_table_total %>%
+  select(Pk, score)
+
+draft_values <- draft_values %>%
+  arrange(Pk) %>%
+  mutate(
+    CumulativeSum = rev(cumsum(rev(score))),
+    ProjectedValue = CumulativeSum / total_value * 100
+  ) %>%
+  select(Pk, ProjectedValue)
+
+```
+
+```{r projected value table}
+draft_values <- draft_values %>%
+  mutate(ProjectedValue = sprintf("%.2f%%", ProjectedValue))
+
+datatable(
+  draft_values,
+  options = list(
+    columnDefs = list(
+      list(
+        targets = '_all',
+        className = 'dt-center'  # Center-aligns text in all columns
+      )
+    )
+  ),
+  caption = htmltools::tags$caption(
+    style = 'caption-side: top; text-align: center; font-size: 16px; font-weight: bold;',
+    'Projected Value of NBA Draft Picks'
+  ),
+  rownames = FALSE  # Remove row names (index column)
+)
+```
+
+
+```{r, results='hide'}
+# Writing to csv files
+write.csv(sensitivity_table_total, file = "NBA_draft.csv", row.names = FALSE)
+write.csv(sensitivity_table, file = "NBA_sensitivity.csv", row.names = FALSE)
+```
+
+```{r, results='hide'}
+superstars_df <- sensitivity_table_total |>
+  group_by(pick_range) |>
+  summarise(TotalSuperstars = sum(Superstar))
+
+superstars_df <- superstars_df |>
+  mutate(pick_range = factor(pick_range, levels = pick_range[order(TotalSuperstars, decreasing = TRUE)]))
+```
+
+```{r Superstars by Pick Range Chart}
+
+superstars_df$pick_range <- factor(superstars_df$pick_range, levels = c("Lottery", "Non Lottery 1st Round", "2nd Round"))
+
+ggplot(superstars_df, aes(x = pick_range, y = TotalSuperstars, fill = pick_range)) +
+  geom_bar(stat = "identity", color = "black", size = 0.2) +  # Adding borders to bars for better visibility
+  geom_text(aes(label = TotalSuperstars), vjust = -0.5, size = 4) +  # Adding labels above bars
+  labs(title = "Total Number of Superstars by Pick Range",
+       x = "Pick Range",
+       y = "Total Superstars") + 
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold", margin = margin(b = 10)),
+    axis.title.x = element_text(size = 14, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 14, face = "bold", margin = margin(r = 10)),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Remove legend if not necessary
+  ) +
+  scale_fill_manual(values = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728")) 
+```
+
+```{r All Stars by Pick Range Chart}
+allstar_df <- sensitivity_table_total |>
+  group_by(pick_range) |>
+  summarise(TotalAllStars = sum(allstar_total))
+
+allstar_df <- allstar_df |>
+  mutate(pick_range = factor(pick_range, levels = pick_range[order(TotalAllStars, decreasing = TRUE)]))
+
+ggplot(allstar_df, aes(x = pick_range, y = TotalAllStars, fill = pick_range)) +
+  geom_bar(stat = "identity", color = "black", size = 0.2) +  # Adding borders to bars for better visibility
+  geom_text(aes(label = TotalAllStars), vjust = -0.3, size = 4) +  # Adding labels above bars
+  labs(title = "Total Number of All-Stars by Pick Range",
+       x = "Pick Range",
+       y = "Total All-Stars") + 
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold", margin = margin(b = 10)),
+    axis.title.x = element_text(size = 14, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 14, face = "bold", margin = margin(r = 10)),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Remove legend if not necessary
+  ) +
+  scale_fill_manual(values = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"))
+```
+
+```{r player distribution chart}
+player_distribution <- sensitivity_table_total |>
+  select(-Pk, -pick_range, -allstar_total)
+player_distribution <- player_distribution %>%
+  pivot_longer(
+    cols = c('Superstar', 'All-NBA', 'All-Star', 'High-end Starter', 'Starter', 'Role Player', 'Rotation Player', 'Bench Player', 'Non-Impact'),
+    names_to = "Category",
+    values_to = "Count"
+  ) %>%
+  group_by(Category) %>%
+  summarize(Total = sum(Count))
+
+player_distribution <- player_distribution %>%
+  mutate(Player_Level = case_when(
+    Category %in% c('Superstar', 'All-NBA', 'All-Star') ~ 'All-Star',
+    Category %in% c('High-end Starter', 'Starter') ~ 'Starter',
+    Category %in% c('Role Player', 'Rotation Player', 'Bench Player') ~ 'In the Rotation',
+    TRUE ~ Category  
+  )) %>%
+  group_by(Player_Level) %>%
+  summarize(Total = sum(Total), .groups = 'drop')
+
+player_distribution <- player_distribution %>%
+  mutate(Percentage = Total / sum(Total) * 100,
+         Label = paste0(round(Percentage, 1), "%"))
+
+colors <- c("All-Star" = "#1f77b4", 
+             "Starter" = "#2ca02c", 
+             "In the Rotation" = "#ff7f0e", 
+             "Non-Impact" = "#d62728")
+
+ggplot(player_distribution, aes(x = "", y = Total, fill = Player_Level)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y") +
+  geom_text(aes(label = Label),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4,
+            fontface = "bold") +
+  labs(title = "Distribution of NBA Players by Level",
+       fill = "Player Level") +
+  scale_fill_manual(values = colors) +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.8, "cm"),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+```
+
+
+```{r Creating Lottery Pie Chart}
+lottery_df <- subset(sensitivity_table_total, pick_range == "Lottery")
+
+# Combine counts by category
+count_levels <- colSums(lottery_df[, c("Superstar", "All-NBA", "All-Star", "High-end Starter", "Starter", "Role Player", "Rotation Player", "Bench Player", "Non-Impact")])
+
+pie_data <- data.frame(
+  Level = names(count_levels),
+  Count = count_levels
+)
+
+# Combine categories into four buckets
+pie_data_combined <- pie_data %>%
+  mutate(Bucket = case_when(
+    Level %in% c("Superstar", "All-NBA", "All-Star") ~ "All-Star",
+    Level %in% c("High-end Starter", "Starter") ~ "Starter",
+    Level %in% c("Role Player", "Rotation Player", "Bench Player") ~ "In the Rotation",
+    Level == "Non-Impact" ~ "Non-Impact",
+    TRUE ~ Level  
+  )) %>%
+  group_by(Bucket) %>%
+  summarize(Count = sum(Count), .groups = 'drop')
+
+colors <- c("All-Star" = "#1f77b4", 
+             "Starter" = "#2ca02c", 
+             "In the Rotation" = "#ff7f0e", 
+             "Non-Impact" = "#d62728")
+
+# Creating a pie chart
+ggplot(pie_data_combined, aes(x = "", y = Count, fill = Bucket)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +  # White border around slices
+  coord_polar("y") +
+  geom_text(aes(label = paste0(round(Count / sum(Count) * 100, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4,
+            fontface = "bold") +
+  labs(title = "Distribution of NBA Players by Lottery Picks",
+       fill = "Player Level") +
+  scale_fill_manual(values = colors) +  # Apply custom color palette
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.8, "cm"),
+    panel.background = element_blank(),  
+    plot.background = element_blank(),   
+    plot.margin = margin(10, 10, 10, 10) 
+  )
+```
+
+```{r}
+non_lottery_df <- subset(sensitivity_table_total, pick_range == "Non Lottery 1st Round")
+
+# Combine counts by category
+count_levels <- colSums(non_lottery_df[, c("Superstar", "All-NBA", "All-Star", "High-end Starter", "Starter", "Role Player", "Rotation Player", "Bench Player", "Non-Impact")])
+
+# Create initial pie data frame
+pie_data <- data.frame(
+  Level = names(count_levels),
+  Count = count_levels
+)
+
+# Combine categories into four buckets
+pie_data_combined <- pie_data %>%
+  mutate(Bucket = case_when(
+    Level %in% c("Superstar", "All-NBA", "All-Star") ~ "All-Star",
+    Level %in% c("High-end Starter", "Starter") ~ "Starter",
+    Level %in% c("Role Player", "Rotation Player", "Bench Player") ~ "In the Rotation",
+    Level == "Non-Impact" ~ "Non-Impact",
+    TRUE ~ Level  # For safety, should not be needed with correct data
+  )) %>%
+  group_by(Bucket) %>%
+  summarize(Count = sum(Count), .groups = 'drop')
+
+# Define color palette
+colors <- c("All-Star" = "#1f77b4", 
+             "Starter" = "#2ca02c", 
+             "In the Rotation" = "#ff7f0e", 
+             "Non-Impact" = "#d62728")
+
+# Creating a pie chart
+ggplot(pie_data_combined, aes(x = "", y = Count, fill = Bucket)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +  # White border around slices
+  coord_polar("y") +
+  geom_text(aes(label = paste0(round(Count / sum(Count) * 100, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4,
+            fontface = "bold") +
+  labs(title = "Distribution of NBA Players by Lottery Picks",
+       fill = "Player Level") +
+  scale_fill_manual(values = colors) +  # Apply custom color palette
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.8, "cm"),
+    panel.background = element_blank(),  
+    plot.background = element_blank(),   
+    plot.margin = margin(10, 10, 10, 10) 
+  )
+```
+
+```{r}
+second_round_df <- subset(sensitivity_table_total, pick_range == "2nd Round")
+
+# Combine counts by category
+count_levels <- colSums(second_round_df[, c("Superstar", "All-NBA", "All-Star", "High-end Starter", "Starter", "Role Player", "Rotation Player", "Bench Player", "Non-Impact")])
+
+# Create initial pie data frame
+pie_data <- data.frame(
+  Level = names(count_levels),
+  Count = count_levels
+)
+
+# Combine categories into four buckets
+pie_data_combined <- pie_data %>%
+  mutate(Bucket = case_when(
+    Level %in% c("Superstar", "All-NBA", "All-Star") ~ "All-Star",
+    Level %in% c("High-end Starter", "Starter") ~ "Starter",
+    Level %in% c("Role Player", "Rotation Player", "Bench Player") ~ "In the Rotation",
+    Level == "Non-Impact" ~ "Non-Impact",
+    TRUE ~ Level
+  )) %>%
+  group_by(Bucket) %>%
+  summarize(Count = sum(Count), .groups = 'drop') %>%
+  mutate(Percentage = Count / sum(Count) * 100,
+         Label = ifelse(Percentage >= 5, paste0(round(Percentage, 1), "%"), ""))
+
+# Define color palette
+colors <- c("All-Star" = "#1f77b4",
+             "Starter" = "#2ca02c",
+             "In the Rotation" = "#ff7f0e",
+             "Non-Impact" = "#d62728")
+
+# Ordering buckets by size to manage pie slice placement
+pie_data_combined <- pie_data_combined %>%
+  arrange(desc(Count)) %>%
+  mutate(Bucket = factor(Bucket, levels = rev(unique(Bucket))))
+
+# Creating a pie chart
+ggplot(pie_data_combined, aes(x = "", y = Count, fill = Bucket)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +  # White border around slices
+  coord_polar("y") +
+  geom_text(aes(label = Label),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4,
+            fontface = "bold") +
+  labs(title = "Distribution of NBA Players by 2nd Round Picks",
+       fill = "Player Level") +
+  scale_fill_manual(values = colors) +  # Apply custom color palette
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.8, "cm"),
+    panel.background = element_blank(),
+    plot.background = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+```
+
+```{r all stars by draft year}
+# Filtering rows where PlayerLevel is one of the specified levels
+stars_by_class <- DraftData %>%
+  filter(PlayerLevel %in% c("Superstar", "All-NBA", "All-Star")) %>%
+  group_by(Year) %>%
+  summarise(TotalPlayers = n(), .groups = 'drop')
+
+ggplot(stars_by_class, aes(x = Year, y = TotalPlayers)) +
+  geom_line(color = "#1f77b4", size = 1.2) +  # Line color and thickness
+  geom_point(color = "#d62728", size = 3) +   # Point color and size
+  labs(title = "Total Number of All-Star Level Players by Draft Class",
+       x = "Year",
+       y = "Total Number of Players") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "#d3d3d3"),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+```
+
