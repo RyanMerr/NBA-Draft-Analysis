@@ -1,0 +1,811 @@
+---
+title: "NBA Draft Analysis"
+output:
+  html_document:
+    warning: FALSE
+date: "`r Sys.Date()`"
+author: "Ryan Merrithew"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r installing packages, include=FALSE}
+library(tidyverse)
+library(gt)
+library(gtExtras)
+library(rvest)
+library(janitor)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(DT)
+```
+
+```{r nba draft data, include=FALSE}
+#Grabbing all years from 2000-2019
+Years <- 2000:2019
+#Putting allyears into one dataframe
+AllYearsDraft <- data.frame()
+#Starting a for loop to loop through every year
+for(i in Years) {
+  # Grabbing how long it takes to grab each table
+TimeA <- Sys.time()
+# Reading in the html and replacing i with year in the for loop
+filmURL <- read_html(paste0("https://www.basketball-reference.com/draft/NBA_",i,".html"))
+# Using the html_table function to read in the url and place it in all tables
+allTables <- filmURL %>%
+  html_table(fill = TRUE)
+# Combines all of the tables together
+Table <- allTables[[1]]
+# Making the first row the headers for the table
+Table <- row_to_names(Table, row_number = 1)
+#Changing some of the column names
+colnames(Table)[8:14] <- c("TMP", "TPTS", "TTRB", "TAST","FGp","ThPp","FTp")
+# Changing the data type for some of the data
+Table <- Table |>
+  filter(!Player %in% c('Player', 'Round 2', '')) |>
+  mutate(Rk = as.numeric(Rk),
+         Pk = as.numeric(Pk),
+         Yrs = as.numeric(Yrs),
+         G = as.numeric(G),
+         TMP = as.numeric(TMP),
+         TPTS = as.numeric(TPTS),
+         TTRB = as.numeric(TTRB),
+         TAST = as.numeric(TAST),
+         FGp = as.numeric(FGp),
+         ThPp = as.numeric(ThPp),
+         FTp = as.numeric(FTp),
+         MPG = as.numeric(MP),
+         PPG = as.numeric(PTS),
+         RPG = as.numeric(TRB),
+         APG = as.numeric(AST),
+         WS = as.numeric(WS),
+         WS48 = as.numeric(`WS/48`),
+         BPM = as.numeric(BPM),
+         VORP = as.numeric(VORP),
+         Year = i)
+# Binding the data together
+AllYearsDraft <- rbind(AllYearsDraft,Table)
+# Makes sure that I am not locked out of basketball reference
+Sys.sleep(3)
+# End of time it took to extract data
+TimeB <- Sys.time()
+# Finding the time difference and printing it
+TimeC <- TimeB-TimeA}
+```
+
+```{r nba player data, include=FALSE}
+# Grabbing all years from 2001-2024
+Years <- 2001:2024
+# Creating an empty player stats dataframe
+AllYearsPlayers <- data.frame()
+# Creating a for loop 
+for (i in Years) {
+  TimeA <- Sys.time()
+  filmURL <- read_html(paste0("https://www.basketball-reference.com/leagues/NBA_",i,"_per_game.html"))
+  allTables <- filmURL |>
+    html_table(fill=TRUE)
+  Table <- allTables[[1]]
+  Table <- Table |>
+    filter(!Player %in% 'Player') |>
+    mutate(Rk = as.numeric(Rk),
+           G = as.numeric(G),
+           GS = as.numeric(GS),
+           MP = as.numeric(MP),
+           FG = as.numeric(FG),
+           FGA = as.numeric(FGA),
+           ThP = as.numeric(`3P`),
+           ThPa = as.numeric(`3PA`),
+           PTS = as.numeric(PTS),
+           TRB = as.numeric(TRB),
+           AST = as.numeric(AST),
+           FGp = as.numeric(`FG%`),
+           ThPp = as.numeric(`3P%`),
+           FTp = as.numeric(`FT%`),
+           Year = i) %>%
+    select(-`FG%`, -`3P%`, -`FT%`)
+  AllYearsPlayers <- rbind(AllYearsPlayers,Table)
+  Sys.sleep(3)
+  TimeB <- Sys.time()
+  TimeC <- TimeB-TimeA}
+```
+
+```{r nba advanced data, include=FALSE}
+# Grabbing all years from 2001-2024
+Years <- 2001:2024
+# Creating an empty player stats dataframe
+AllYearsAdvanced <- data.frame()
+# Creating a for loop 
+for (i in Years) {
+  TimeA <- Sys.time()
+  filmURL <- read_html(paste0("https://www.basketball-reference.com/leagues/NBA_", i, "_advanced.html"))
+  allTables <- filmURL |>
+    html_table(fill=TRUE)
+  Table <- allTables[[1]]
+  Table <- Table |>
+    select(where(~ !all(is.na(.) | . == ""))) |>
+    filter(!Player %in% 'Player') |>
+    mutate(WS = as.numeric(WS),
+           BPM = as.numeric(BPM),
+           G = as.numeric(G),
+           Year = i) 
+  AllYearsAdvanced <- rbind(AllYearsAdvanced,Table)
+  Sys.sleep(3)
+  TimeB <- Sys.time()
+  TimeC <- TimeB-TimeA}
+```
+
+```{r cleaning the dataframes, include=FALSE}
+# Cleaning the draft data
+AllYearsDraft <- AllYearsDraft |>
+  select("Pk", "Player", "Year") 
+# Cleaning the player stats dataframe
+AllYearsPlayers <- AllYearsPlayers |>
+  select("Player", "Year", "G", "PTS", "TRB", "AST", "STL", "BLK", "TOV", "MP") |>
+  mutate(STL = as.numeric(STL),
+         BLK = as.numeric(BLK),
+         TOV = as.numeric(TOV)
+  )
+# Cleaning the advanced dataframe
+AllYearsAdvanced <- AllYearsAdvanced |>
+  select("Player", "Year", "G", "PER", "WS", "BPM") |>
+  mutate(PER = as.numeric(PER)) 
+
+```
+
+```{r, include=FALSE}
+# More data cleaning, creating a table with number of games
+GamesByYear <- data.frame(
+  Year = c(2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024),
+  MaxGP = c(82, 82, 82, 82, 82, 82, 82, 82, 82, 82, 82, 66, 82, 82, 82, 82, 82, 82, 82, 75, 72, 82, 82, 82)
+)
+# Merge the games played data onto the player data
+AllYearsPlayers <- AllYearsPlayers |>
+  left_join(GamesByYear, by = c('Year'))
+# Removing players that played less than half of the games
+AllYearsPlayers <- AllYearsPlayers |>
+  filter(G / MaxGP >= 0.5)
+```
+
+```{r, include=FALSE}
+# Merge the games played data onto the player advanced data
+AllYearsAdvanced <- AllYearsAdvanced |>
+  left_join(GamesByYear, by = c('Year'))
+# Removing players that played less than half of the games
+AllYearsAdvanced <- AllYearsAdvanced |>
+  filter(G / MaxGP >= 0.5)
+```
+
+```{r, include=FALSE}
+# Merging the advanced and player tables together
+PlayerStats <- AllYearsPlayers |>
+  left_join(AllYearsAdvanced, c('Player', 'Year', 'G'))
+# Removing rows that are not unique for (Player, Year)
+PlayerStats <- PlayerStats %>%
+  group_by(Player, Year) %>%
+  filter(G == max(G)) %>%
+  ungroup()
+```
+
+```{r, include=FALSE}
+# Removing some columns from the dataframe and creating a new overall calculation 
+PlayerStats <- PlayerStats |>
+  select("Player", "Year", "G", "MP", "PTS", "TRB", "AST", "STL", "BLK", "TOV", "PER", "WS", "BPM") |>
+  mutate(
+    WSp82 = ((WS/G) * 82),
+    Total = (PTS * 2 + TRB * 1.2 + AST * 1.5 + STL * 3 + BLK * 3 - TOV * 2 + (MP/2) + WSp82)
+  )
+
+```
+
+```{r, include=FALSE}
+# Rnaking players
+PlayerStats <- PlayerStats |>
+  group_by(Year) |>
+  mutate(
+    Rank = dense_rank(desc(Total))
+  ) |>
+  ungroup()
+```
+
+```{r, include=FALSE}
+# Getting an average of the best 3 years of a player's career
+PlayerPrimes <- PlayerStats |>
+  group_by(Player) |>
+  summarise(
+    Prime_rank = mean(sort(Rank)[1:3])
+  )
+```
+
+```{r, include=FALSE}
+PlayerPrimes <- PlayerPrimes |>
+  mutate(
+    PlayerLevel = case_when(
+      Prime_rank <= 5 ~ "Superstar",
+      Prime_rank <= 15 ~ "All-NBA",
+      Prime_rank <= 30 ~ "All-Star",
+      Prime_rank <= 50 ~ "High-end Starter",
+      Prime_rank <= 100 ~ "Starter",
+      Prime_rank <= 150 ~ "Role Player",
+      Prime_rank <= 200 ~ "Rotation Player",
+      Prime_rank <= 250 ~ "Bench Player",
+      TRUE ~ "Non-Impact"
+    )
+  )
+```
+
+```{r, include=FALSE}
+# Making sure there are no duplicate names before I join
+num_unique_draft <- length(unique(AllYearsDraft$Player))
+num_unique_primes <- length(unique(PlayerPrimes$Player))
+# Getting list of duplicate player names
+duplicated_values <- AllYearsDraft$Player[duplicated(AllYearsDraft$Player)]
+# Remove character in order for data to join properly
+PlayerPrimes$Player <- sub("\\*$", "", PlayerPrimes$Player)
+# Left joining the prime table to the draft table
+DraftData <- AllYearsDraft |>
+  left_join(PlayerPrimes, by = c('Player'))
+# Removing duplicates and making manual changes
+DraftData[DraftData$Player == "Marcus Thornton" & DraftData$Year == 2015, c("PlayerLevel", "Prime_rank")] <- 
+  list("Non-Impact", NA)
+DraftData[DraftData$Player == "Marcus Williams" & DraftData$Year == 2007, c("PlayerLevel", "Prime_rank")] <- 
+  list("Non-Impact", NA)
+DraftData[DraftData$Player == "Justin Jackson" & DraftData$Year == 2018, c("PlayerLevel", "Prime_rank")] <- 
+  list("Non-Impact", NA)
+DraftData[DraftData$Player == "Zion Williamson", c("PlayerLevel", "Prime_rank")] <- 
+  list("All-Star", 20.5)
+DraftData$PlayerLevel[is.na(DraftData$PlayerLevel)] <- "Non-Impact"
+```
+
+```{r, include=FALSE}
+# Creating a sensitivity table
+sensitivity_table <- DraftData |>
+  group_by(Pk, PlayerLevel) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = PlayerLevel, values_from = count, values_fill = list(count = 0)) |>
+  ungroup()
+
+sensitivity_table <- sensitivity_table |>
+  select('Pk', 'Superstar', 'All-NBA', 'All-Star', 'High-end Starter', 'Starter', 'Role Player', 'Rotation Player', 'Bench Player', 'Non-Impact') |>
+  rename(Pk = 0)
+# Add a 'Total' column which is the row sum of all columns except 'Pk'
+sensitivity_table <- sensitivity_table %>%
+  rowwise() %>%
+  mutate(Total = sum(c_across(-Pk))) %>%
+  ungroup() %>%
+  # Normalize the values by dividing each value by the Total
+  mutate(across(-c(Pk, Total), ~ . / Total)) %>%
+  # Convert numeric values to percentage format
+  mutate(across(-c(Pk, Total))) %>%
+  select(Pk, everything()) |>
+  select(-Total)
+
+```
+
+How much value lies in each NBA draft pick? How likely is a team to draft an all-star in the first round? What are the chances a second round pick turns out? All of these questions and more are going to be answered in this analysis. 
+
+I took every player from the 2000-2019 NBA Draft. I did this so that every player has at least 5 years of playing time before I analyze their success and give them a label. After taking every player from these draft classes, I had to figure out a way to label each of these players based on their talent level. Amongst fans and writers, there are always player rankings and tiers. Not every ranking is perfect and everyone has their own opinion, whether you agree with it or not. My rankings may not be perfect but they give a great estimation of which tier each player belongs in. Here is how I ranked the players:
+
+First, I ranked every player for every season. This includes the 2001 season all the way up to the most recent season, 2024. The reason I did this was because it isn't always accurate taking career numbers for every player. Some players have played 20 seasons while others have only played 5. Instead of taking an entire career and averaging out the value, I decided to look at a 3 year peak for every player. This gives a much better idea of how good a player was in the prime of his career. Here is the formula I used to rank the players: 
+
+((Points * 2) + (Rebounds * 1.2) + (Assists * 1.5) + (Steals * 3) + (Blocks * 3) - (Turnovers * 2) + (Minutes / 2) + Win Shares per 82 games played))
+
+**All stats are on a per game basis**
+
+I am perfectly aware that this is not a perfect ranking. I tried several all in one rankings and this one returned the most accurate results. Another side note is that to qualify for the rankings, every player had to play in at least half of the total games for that season. If not, they were excluded from the ranking from that year. After ranking the players, I decided to break the player into 9 different tiers to determine the success they had during their careers. The tiers include, from best to worst: 
+
+Superstar, All-NBA, All-Star, High-end Starter, Starter, Role Player, Rotation Player, Bench Player, Non-Impact
+
+You might be wondering how I determined exactly which players fall into each tier. Let me explain. Once I found every players best 3 seasons, I averaged them out and broke it down. The number that corresponds to each label is the average overall ranking for each of the players:
+
+- Superstar: 1-5
+- All-NBA: 6-15
+- All-Star: 16-30
+- High-end Starter: 31-50
+- Starter: 51-100
+- Role Player: 101-150
+- Rotation Player: 151-200
+- Bench Player: 201-250
+- Non-Impact: Less than 250 or did not play in 3 healthy seasons
+
+Here is a list of some of the players in each tier over the past 20 seasons:
+
+```{r, echo=FALSE}
+# Creating a player tier example dataframe
+example_table <- data.frame(
+  Tier = c("Superstar", "All-NBA", "All-Star", "High-end Starter", "Starter", "Role Player", "Rotation Player", "Bench Player", "Non-Impact"),
+  Players = c("Lebron James, Nikola Jokic, James Harden", "Blake Griffin, Jimmy Butler, Paul George", "Deron Williams, Pascal Siakam, Kemba Walker", "Luol Deng, Eric Bledsoe, Derrick Favors", "Josh Hart, Jae Crowder, Michael Porter Jr.", "Kevin Huerter, Cameron Johnson, Danny Green", "Luke Kennard, Jarred Vanderbilt, Tyler Zeller", "Meyers Leonard, Kevin Knox, Mike Muscala", "Ryan Hollins, Aaron Gray, Jimmer Fredette")
+)
+
+write.csv(DraftData, file = "NBA_player_tiers.csv", row.names = FALSE)
+
+gt(example_table)
+```
+
+As you can see, this returns a very respectable and accurate list of players and their impact on the game. A Superstar is a top 5 player in the league, All-NBA is top 15, All-Star is top 30 and so on. If you are curious about more players, you can take a look at the table [here](NBA_player_tiers.csv).
+
+Now that you have a basic understanding of how the players were ranked and categorized, here are the numbers that explain the NBA Draft.
+
+The first table here is similar to a sensitivity table. The rows are represented by the pick number and the columns are the likelihood that each tier of player is taken at each at each individual pick. Dark red represents the more dense areas while the light yellow represents low density. 
+
+```{r, echo = FALSE}
+# gt_table <- sensitivity_table %>%
+#   gt() %>%
+#   fmt_number(columns = everything(), decimals = 0) %>%  # Ensure whole numbers
+#   data_color(
+#     columns = vars(Superstar, `All-NBA`, `All-Star`, `High-end Starter`, Starter, `Role Player`, `Rotation Player`, `Bench Player`, `Non-Impact`),
+#     colors = scales::col_numeric(
+#       palette = c("lightyellow", "darkred"),
+#       domain = NULL
+#     )
+#   )
+# 
+# gt_table
+
+gt_table <- sensitivity_table %>%
+  gt() %>%
+  fmt_percent(
+    columns = vars(Superstar, `All-NBA`, `All-Star`, `High-end Starter`, Starter, `Role Player`, `Rotation Player`, `Bench Player`, `Non-Impact`),
+    decimals = 0  # Adjust decimals as needed
+  ) %>%
+  data_color(
+    columns = vars(Superstar, `All-NBA`, `All-Star`, `High-end Starter`, Starter, `Role Player`, `Rotation Player`, `Bench Player`, `Non-Impact`),
+    colors = scales::col_numeric(
+      palette = c("lightyellow", "darkred"),
+      domain = NULL
+    )
+  ) %>%
+  tab_header(
+    title = "History of NBA Draft Pick Value From 2000 to 2019",
+    subtitle = "This table shows what percentage of players were taken in each player tier for each individual draft pick. All numbers are percentages of the pick number. "
+  ) %>%
+  tab_spanner(
+    label = "Player Tiers",
+    columns = vars(Superstar, `All-NBA`, `All-Star`, `High-end Starter`, Starter, `Role Player`, `Rotation Player`, `Bench Player`, `Non-Impact`)
+  )
+
+# Print the table
+gt_table
+```
+
+The first thing that jumps out to me is how difficult it is to land a superstar. Even at the first pick, there is only a 15 percent chance that the player picked will become a top 5 player in the NBA. You at least have a 55 percent chance of the player turning into an all-star. Most years, if a player is selected number one, there are high expectations and many people expect them to be superstars. This is most likely an unfair judgement but it comes with being selected first overall. Suprisingly enough, there have been more superstars taken at the 3rd pick than the 1st pick. Does this mean that the 3rd pick has more value than the first pick? Absolutely not. I will explain this later on. Some teams are better at drafting than others and it can skew the numbers. If every team picked the best avaliable player at each pick, we wouldn't even need to have this analysis. But, even the experts and smartest basketball minds can't predict which players will become the next Lebron James, and which ones will be the second coming of Anthony Bennett, a draft day disaster. 
+
+As you start going down the table, drafting players who even turn out to be bench players is a scarcity. The second round is a very hard spot to find any talent, let alone an all-star caliber player. There has only been 1 superstar taken in the entire second round from 2000 to 2019. His name is Nikola Jokic. That could go down as the greatest draft day steal of all time. Another incredible pick included the Kings selected Isaiah Thomas with the last pick in the draft! Sure, his prime was short but he was an excellent pick for the last pick of the draft and the only player that has had any impact at pick 60 during those years. 
+
+Find the most interesting draft trends and keep them in mind during next years draft. There are a lot of stories to be told in this data. There are many interesting trends found in this graph and I could waste all your time talking about them. For now, I will move on and take a deeper dive into the data. 
+
+Remember when I said the 1st pick is more valuable than the 3rd pick even though more superstars have been selected at pick number 1? Here is where you can see that on display. Using a few other calculations, I projected the value of every draft pick. The 1st pick provides the most value because you get to choose whoever you want in the draft. Every other number is the projected value relative to the first pick. If you look at pick number 10 that equals 59.85%, this means that the 10th picks is 59.85% of the value that the first pick is. You can scroll through this table to find the value at each pick. To no surprise the later the pick, the less value it has. 
+```{r, include=FALSE}
+sensitivity_table_total <- DraftData |>
+  group_by(Pk, PlayerLevel) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = PlayerLevel, values_from = count, values_fill = list(count = 0)) |>
+  ungroup()
+
+sensitivity_table_total <- sensitivity_table_total |>
+  select('Pk', 'Superstar', 'All-NBA', 'All-Star', 'High-end Starter', 'Starter', 'Role Player', 'Rotation Player', 'Bench Player', 'Non-Impact') |>
+  rename(Pk = 0)
+# Adding in draft range column
+sensitivity_table_total <- sensitivity_table_total |>
+  mutate(pick_range = case_when(
+    Pk >= 1 & Pk <= 14 ~ "Lottery",
+    Pk >= 15 & Pk <= 30 ~ "Non Lottery 1st Round",
+    Pk >= 31 & Pk <= 60 ~ "2nd Round",
+    TRUE ~ "Other"
+  ))
+# Creating a score to evaluate the total value of a draft position
+sensitivity_table_total <- sensitivity_table_total |>
+  mutate(allstar_total = Superstar + `All-NBA` + `All-Star`,
+         score = Superstar * 10 + `All-NBA` * 7 + `All-Star` * 5 + `High-end Starter` * 4 + Starter * 3 + `Role Player` * 2 + `Rotation Player` + `Bench Player` * 0.5)
+
+total_value = sum(sensitivity_table_total$score)
+
+draft_values <- sensitivity_table_total %>%
+  select(Pk, score)
+
+draft_values <- draft_values %>%
+  arrange(Pk) %>%
+  mutate(
+    CumulativeSum = rev(cumsum(rev(score))),
+    ProjectedValue = CumulativeSum / total_value * 100
+  ) %>%
+  select(Pk, ProjectedValue)
+
+```
+
+```{r projected value table, echo = FALSE}
+draft_values <- draft_values %>%
+  mutate(ProjectedValue = sprintf("%.2f%%", ProjectedValue))
+
+# Create the DataTable
+datatable(
+  draft_values,
+  options = list(
+    columnDefs = list(
+      list(
+        targets = '_all',
+        className = 'dt-center'  # Center-aligns text in all columns
+      )
+    )
+  ),
+  caption = htmltools::tags$caption(
+    style = 'caption-side: top; text-align: center; font-size: 16px; font-weight: bold;',
+    'Projected Value of NBA Draft Picks'
+  ),
+  rownames = FALSE  # Remove row names (index column)
+)
+```
+
+For the next graphs, I group the data by pick range. I simply group them by Lottery (Picks 1-14), Non-Lottery 1st Round (Picks 15-30), and 2nd Round (Picks 31-60). This first graph shows the number of superstars and where they were drafted. To no surprise 14 of the 16 superstars taken were in the Lottery. Giannis Antetokounmpo was taken at pick 15, one pick outside the lottery, and Nikola Jokic at pick 41. Jokic and Giannis both being international players that weren't fully developed before entering the draft is how those superstars were passed up by the other teams. If there was a redraft, every single team would have taken Giannis and Jokic number one without having to think about it.
+
+```{r, include=FALSE}
+# Writing to csv files
+write.csv(sensitivity_table_total, file = "NBA_draft.csv", row.names = FALSE)
+write.csv(sensitivity_table, file = "NBA_sensitivity.csv", row.names = FALSE)
+```
+
+```{r, include=FALSE}
+superstars_df <- sensitivity_table_total |>
+  group_by(pick_range) |>
+  summarise(TotalSuperstars = sum(Superstar))
+
+superstars_df <- superstars_df |>
+  mutate(pick_range = factor(pick_range, levels = pick_range[order(TotalSuperstars, decreasing = TRUE)]))
+```
+
+```{r Superstars by Pick Range Chart, echo = FALSE}
+
+# ggplot(superstars_df, aes(x = pick_range, y = TotalSuperstars, fill = pick_range)) +
+#   geom_bar(stat = "identity") +
+#   labs(title = "Total Number of Superstars by Pick Range",
+#        x = "Pick Range",
+#        y = "Total Superstars") + 
+#   theme_minimal()
+
+superstars_df$pick_range <- factor(superstars_df$pick_range, levels = c("Lottery", "Non Lottery 1st Round", "2nd Round"))
+
+ggplot(superstars_df, aes(x = pick_range, y = TotalSuperstars, fill = pick_range)) +
+  geom_bar(stat = "identity", color = "black", size = 0.2) +  # Adding borders to bars for better visibility
+  geom_text(aes(label = TotalSuperstars), vjust = -0.5, size = 4) +  # Adding labels above bars
+  labs(title = "Total Number of Superstars by Pick Range",
+       x = "Pick Range",
+       y = "Total Superstars") + 
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold", margin = margin(b = 10)),
+    axis.title.x = element_text(size = 14, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 14, face = "bold", margin = margin(r = 10)),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Remove legend if not necessary
+  ) +
+  scale_fill_manual(values = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728")) 
+```
+
+We know superstars are a rarity. Only 16 of them drafted from 2000 to 2019. Not even one every season comes around! So, looking through a more realistic lens, how likely are you to draft at least an all-star or better based on your pick range? 
+
+```{r All Stars by Pick Range Chart, echo = FALSE}
+allstar_df <- sensitivity_table_total |>
+  group_by(pick_range) |>
+  summarise(TotalAllStars = sum(allstar_total))
+
+allstar_df <- allstar_df |>
+  mutate(pick_range = factor(pick_range, levels = pick_range[order(TotalAllStars, decreasing = TRUE)]))
+
+# ggplot(allstar_df, aes(x = pick_range, y = TotalAllStars, fill = pick_range)) +
+#   geom_bar(stat = "identity") +
+#   labs(title = "Total Number of All-Stars by Pick Range",
+#        x = "Pick Range",
+#        y = "Total All-Stars") + 
+#   theme_minimal()
+
+ggplot(allstar_df, aes(x = pick_range, y = TotalAllStars, fill = pick_range)) +
+  geom_bar(stat = "identity", color = "black", size = 0.2) +  # Adding borders to bars for better visibility
+  geom_text(aes(label = TotalAllStars), vjust = -0.3, size = 4) +  # Adding labels above bars
+  labs(title = "Total Number of All-Stars by Pick Range",
+       x = "Pick Range",
+       y = "Total All-Stars") + 
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold", margin = margin(b = 10)),
+    axis.title.x = element_text(size = 14, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 14, face = "bold", margin = margin(r = 10)),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Remove legend if not necessary
+  ) +
+  scale_fill_manual(values = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"))
+```
+
+The lottery still dominates the field with 60 of the 89 all star players taken in that range. But, it isn't impossible to find great talent outside the lottery! There were 19 all-stars taken in the late first round and 10 in the second round. It still isn't nearly as likely as the top of the draft but, there is star power that is hiding in these ranges. Kawhi Leonard, Jimmy Butler and Rudy Gobert are great examples of this. 
+
+Now, let's look at the entire draft classes as a whole. I decided to group the player tiers into smaller tiers for better visualization purposes. Players ranked 1 through 30 are now part of the all-star tier, 31-100 are apart of the starter tier, players ranked 101-250 are part of the in the rotation tier, and players less than 250 are in the non-impact tier. What is the distribution of talent, regardless of draft position?
+
+```{r player distribution chart, echo = FALSE}
+player_distribution <- sensitivity_table_total |>
+  select(-Pk, -pick_range, -allstar_total)
+player_distribution <- player_distribution %>%
+  pivot_longer(
+    cols = c('Superstar', 'All-NBA', 'All-Star', 'High-end Starter', 'Starter', 'Role Player', 'Rotation Player', 'Bench Player', 'Non-Impact'),
+    names_to = "Category",
+    values_to = "Count"
+  ) %>%
+  group_by(Category) %>%
+  summarize(Total = sum(Count))
+
+player_distribution <- player_distribution %>%
+  mutate(Player_Level = case_when(
+    Category %in% c('Superstar', 'All-NBA', 'All-Star') ~ 'All-Star',
+    Category %in% c('High-end Starter', 'Starter') ~ 'Starter',
+    Category %in% c('Role Player', 'Rotation Player', 'Bench Player') ~ 'In the Rotation',
+    TRUE ~ Category  
+  )) %>%
+  group_by(Player_Level) %>%
+  summarize(Total = sum(Total), .groups = 'drop')
+
+player_distribution <- player_distribution %>%
+  mutate(Percentage = Total / sum(Total) * 100,
+         Label = paste0(round(Percentage, 1), "%"))
+
+colors <- c("All-Star" = "#1f77b4", 
+             "Starter" = "#2ca02c", 
+             "In the Rotation" = "#ff7f0e", 
+             "Non-Impact" = "#d62728")
+
+ggplot(player_distribution, aes(x = "", y = Total, fill = Player_Level)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y") +
+  geom_text(aes(label = Label),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4,
+            fontface = "bold") +
+  labs(title = "Distribution of NBA Players by Level",
+       fill = "Player Level") +
+  scale_fill_manual(values = colors) +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.8, "cm"),
+    # panel.background = element_rect(fill = "white", color = "black"),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+```
+
+The first thing that stands out is that 52.4% of all players draft don't become impactful players in the NBA. The league is that hard. Only about 8-10 players on every team get significant playing time. This data backs up the fact that even if you make it to the league and get drafted, you are not guaranteed success. For the other 47.6% of the league, they do make a difference. 25.5% of them become guys that are in the rotation. Only 14.6% are starters at best and 7.5% are considered all-stars. 
+
+What if we look at this same chart but by pick range, like we did in the two bar graphs above. The results change significantly.
+
+```{r Creating Lottery Pie Chart, echo = FALSE}
+lottery_df <- subset(sensitivity_table_total, pick_range == "Lottery")
+
+# Combine counts by category
+count_levels <- colSums(lottery_df[, c("Superstar", "All-NBA", "All-Star", "High-end Starter", "Starter", "Role Player", "Rotation Player", "Bench Player", "Non-Impact")])
+
+# Create initial pie data frame
+pie_data <- data.frame(
+  Level = names(count_levels),
+  Count = count_levels
+)
+
+# Combine categories into four buckets
+pie_data_combined <- pie_data %>%
+  mutate(Bucket = case_when(
+    Level %in% c("Superstar", "All-NBA", "All-Star") ~ "All-Star",
+    Level %in% c("High-end Starter", "Starter") ~ "Starter",
+    Level %in% c("Role Player", "Rotation Player", "Bench Player") ~ "In the Rotation",
+    Level == "Non-Impact" ~ "Non-Impact",
+    TRUE ~ Level  # For safety, should not be needed with correct data
+  )) %>%
+  group_by(Bucket) %>%
+  summarize(Count = sum(Count), .groups = 'drop')
+
+# Define color palette
+colors <- c("All-Star" = "#1f77b4", 
+             "Starter" = "#2ca02c", 
+             "In the Rotation" = "#ff7f0e", 
+             "Non-Impact" = "#d62728")
+
+# Create pie chart
+ggplot(pie_data_combined, aes(x = "", y = Count, fill = Bucket)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +  # White border around slices
+  coord_polar("y") +
+  geom_text(aes(label = paste0(round(Count / sum(Count) * 100, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4,
+            fontface = "bold") +
+  labs(title = "Distribution of NBA Players by Lottery Picks",
+       fill = "Player Level") +
+  scale_fill_manual(values = colors) +  # Apply custom color palette
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.8, "cm"),
+    panel.background = element_blank(),  
+    plot.background = element_blank(),   
+    plot.margin = margin(10, 10, 10, 10) 
+  )
+```
+
+When looking at all players selected from picks 1 to 14, or in the lottery as they say in NBA terms, 21.4% become all-stars. This is almost 3 times higher than the distribution of all players drafted. Another 28.9% become starters, and 34.6% are in the rotation. This leaves only 15% of players that don't become impactful at all in the NBA, 3 times lower than when we look at the entire draft. Is it because players selected in the lottery are getting paid more on their rookie contracts? Maybe, but that is a conversation for another day. Overall, there is far more production in lottery players on average.
+
+Next, let's look at a graph of the Non-Lottery 1st Round Picks, Picks 15-30.
+
+```{r, echo = FALSE}
+non_lottery_df <- subset(sensitivity_table_total, pick_range == "Non Lottery 1st Round")
+
+# Combine counts by category
+count_levels <- colSums(non_lottery_df[, c("Superstar", "All-NBA", "All-Star", "High-end Starter", "Starter", "Role Player", "Rotation Player", "Bench Player", "Non-Impact")])
+
+# Create initial pie data frame
+pie_data <- data.frame(
+  Level = names(count_levels),
+  Count = count_levels
+)
+
+# Combine categories into four buckets
+pie_data_combined <- pie_data %>%
+  mutate(Bucket = case_when(
+    Level %in% c("Superstar", "All-NBA", "All-Star") ~ "All-Star",
+    Level %in% c("High-end Starter", "Starter") ~ "Starter",
+    Level %in% c("Role Player", "Rotation Player", "Bench Player") ~ "In the Rotation",
+    Level == "Non-Impact" ~ "Non-Impact",
+    TRUE ~ Level  # For safety, should not be needed with correct data
+  )) %>%
+  group_by(Bucket) %>%
+  summarize(Count = sum(Count), .groups = 'drop')
+
+# Define color palette
+colors <- c("All-Star" = "#1f77b4", 
+             "Starter" = "#2ca02c", 
+             "In the Rotation" = "#ff7f0e", 
+             "Non-Impact" = "#d62728")
+
+# Create pie chart
+ggplot(pie_data_combined, aes(x = "", y = Count, fill = Bucket)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +  # White border around slices
+  coord_polar("y") +
+  geom_text(aes(label = paste0(round(Count / sum(Count) * 100, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4,
+            fontface = "bold") +
+  labs(title = "Distribution of NBA Players by Non-Lottery 1st Round Picks",
+       fill = "Player Level") +
+  scale_fill_manual(values = colors) +  # Apply custom color palette
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.8, "cm"),
+    panel.background = element_blank(),  
+    plot.background = element_blank(),   
+    plot.margin = margin(10, 10, 10, 10) 
+  )
+```
+
+There is a big difference between the superstars and the non impact players in this tier. 39.3% of players in the late 1st round don't turn out. We don't see much of a change in the players that are "In the Rotation". This could be because players selected in this range aren't expected to be stars, but players that fill team needs. Still, there are a few players in this list that turn into all-stars, 6% and 19.8% become starters. This makes for 25.8% of players in this range become starters on an NBA team. Not bad, but obviously much lower than the lottery tier.
+
+Lastly, let's look at player distribution amongst 2nd round picks. This is where things really start to change. 
+
+```{r, echo = FALSE}
+second_round_df <- subset(sensitivity_table_total, pick_range == "2nd Round")
+
+# Combine counts by category
+count_levels <- colSums(second_round_df[, c("Superstar", "All-NBA", "All-Star", "High-end Starter", "Starter", "Role Player", "Rotation Player", "Bench Player", "Non-Impact")])
+
+# Create initial pie data frame
+pie_data <- data.frame(
+  Level = names(count_levels),
+  Count = count_levels
+)
+
+# Combine categories into four buckets
+pie_data_combined <- pie_data %>%
+  mutate(Bucket = case_when(
+    Level %in% c("Superstar", "All-NBA", "All-Star") ~ "All-Star",
+    Level %in% c("High-end Starter", "Starter") ~ "Starter",
+    Level %in% c("Role Player", "Rotation Player", "Bench Player") ~ "In the Rotation",
+    Level == "Non-Impact" ~ "Non-Impact",
+    TRUE ~ Level
+  )) %>%
+  group_by(Bucket) %>%
+  summarize(Count = sum(Count), .groups = 'drop') %>%
+  mutate(Percentage = Count / sum(Count) * 100,
+         Label = ifelse(Percentage >= 5, paste0(round(Percentage, 1), "%"), ""))
+
+# Define color palette
+colors <- c("All-Star" = "#1f77b4",
+             "Starter" = "#2ca02c",
+             "In the Rotation" = "#ff7f0e",
+             "Non-Impact" = "#d62728")
+
+# Order buckets by size to manage pie slice placement
+pie_data_combined <- pie_data_combined %>%
+  arrange(desc(Count)) %>%
+  mutate(Bucket = factor(Bucket, levels = rev(unique(Bucket))))
+
+# Create pie chart
+ggplot(pie_data_combined, aes(x = "", y = Count, fill = Bucket)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +  # White border around slices
+  coord_polar("y") +
+  geom_text(aes(label = Label),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4,
+            fontface = "bold") +
+  labs(title = "Distribution of NBA Players by 2nd Round Picks",
+       fill = "Player Level") +
+  scale_fill_manual(values = colors) +  # Apply custom color palette
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.8, "cm"),
+    panel.background = element_blank(),
+    plot.background = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+```
+
+A large majority of the players taken in the second round don't even play in the NBA or have very minimal impact. As we can see in this chart 77.2% to be exact. This is why in today's league, we see teams trade 4 or 5 second round picks for a rotation player at best. These teams know that the second round doesn't produce much talent and they don't want to put all the effort into something that doesn't have a high return value. Sometimes, they can be in the roation, 16.1% of the time. Very rarely do they become starters, let alone all-stars. 
+
+This last graph is a fun chart to show how the talent varies by draft class. This analysis was done looking at averages across the 20 draft classes that we looked at. 
+
+```{r all stars by draft year, echo = FALSE}
+# Filter rows where PlayerLevel is one of the specified levels
+stars_by_class <- DraftData %>%
+  filter(PlayerLevel %in% c("Superstar", "All-NBA", "All-Star")) %>%
+  group_by(Year) %>%
+  summarise(TotalPlayers = n(), .groups = 'drop')
+
+ggplot(stars_by_class, aes(x = Year, y = TotalPlayers)) +
+  geom_line(color = "#1f77b4", size = 1.2) +  # Line color and thickness
+  geom_point(color = "#d62728", size = 3) +   # Point color and size
+  labs(title = "Total Number of All-Star Level Players by Draft Class",
+       x = "Year",
+       y = "Total Number of Players") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "#d3d3d3"),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+```
+
+There is a lot of variance year to year on the number of all-star level players in each draft class. The latest years like 2018 and 2019 might not be completely accurate yet beccause those players haven't blossomed into their best versions yet. What a difference from 2000 to 2001. Typically you can expect about 4 or 5 all-stars in an average draft class.
+
+I hope this analysis provided great insights on the NBA draft and the trends that we've seen over the past few centuries!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
